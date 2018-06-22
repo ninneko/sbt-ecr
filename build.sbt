@@ -1,9 +1,7 @@
+lazy val root = project in file(".")
 sbtPlugin     := true
 name          := "sbt-ecr"
 organization  := "com.mintbeans"
-description   := "sbt plugin for managing Amazon ECR repositories"
-startYear     := Some(2016)
-licenses      += ("Apache-2.0", url("https://www.apache.org/licenses/LICENSE-2.0.html"))
 
 sbtVersion in Global := "1.0.3"
 crossSbtVersions     := List("0.13.16", "1.1.4")
@@ -21,6 +19,12 @@ libraryDependencies ++= {
   Seq(
     "com.amazonaws"  %  "aws-java-sdk-sts"   % amazonSdkV,
     "com.amazonaws"  %  "aws-java-sdk-ecr"   % amazonSdkV,
+    Defaults.sbtPluginExtra(
+      "com.typesafe.sbt" % "sbt-native-packager" % "1.3.4" % "provided",
+      (sbtBinaryVersion in pluginCrossBuild).value,
+      (scalaBinaryVersion in pluginCrossBuild).value
+    ),
     "org.scalatest"  %% "scalatest"      % scalaTestV % "test"
   )
 }
+
