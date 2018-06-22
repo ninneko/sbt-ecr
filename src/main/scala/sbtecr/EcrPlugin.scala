@@ -1,6 +1,9 @@
 package sbtecr
 
 import com.amazonaws.regions.Region
+import com.typesafe.sbt.SbtNativePackager.autoImport.packageName
+import com.typesafe.sbt.SbtNativePackager.{autoImport => docker}
+import com.typesafe.sbt.packager.docker.DockerPlugin
 import sbt.Keys._
 import sbt._
 import sbtecr.Commands._
@@ -23,11 +26,33 @@ object EcrPlugin extends AutoPlugin {
   }
 
   import autoImport._
-  override lazy val projectSettings = inConfig(Ecr)(defaultSettings ++ tasks)
+
+  override def requires = DockerPlugin
+
+  override lazy val projectSettings = inConfig(Ecr)(defaultSettings ++ tasks ++ dockerSettings)
+
+  import DockerPlugin.autoImport.Docker
+  lazy val packagerKeys = com.typesafe.sbt.packager.Keys
+  lazy val deploy = ""
 
   lazy val defaultSettings: Seq[Def.Setting[_]] = Seq(
-    repositoryTags := List("latest"),
-    localDockerImage := s"${repositoryName.value}:${version.value}"
+    repositoryTags   := {deploy match {
+                            case "prod" => Seq("prod-" + version.value)
+                            case "acc"  => Seq("acc-"  + version.value)
+                            case _      => Seq("stg-"  + version.value)
+                         }},
+    localDockerImage := s"${(packageName in Docker).value}:${(version in Docker).value}",
+    repositoryName   := {deploy match {
+                            case "prod" => (packageName in Docker).value
+                            case "acc"  => (packageName in Docker).value
+                            case _      => (packageName in Docker).value + "-stg"
+                        }}
+  )
+  lazy val dockerSettings: Seq[Def.Setting[_]] = Seq(
+    packagerKeys.maintainer         := "ml infra <ml-infra@nextbeat.net>",
+    packagerKeys.dockerBaseImage    := "openjdk:8-jre",
+    packagerKeys.dockerExposedPorts := Seq(9000, 9000),
+    version in Docker               := "latest",
   )
 
   lazy val tasks: Seq[Def.Setting[_]] = Seq(
@@ -47,8 +72,8 @@ object EcrPlugin extends AutoPlugin {
       }
     },
     push := {
+      login.value
       implicit val logger = streams.value.log
-
       val accountId = AwsSts.accountId(region.value)
 
       val src = localDockerImage.value
